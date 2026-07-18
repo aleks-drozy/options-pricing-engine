@@ -1,0 +1,932 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Options Pricing Engine</title>
+<style>
+  :root {
+    --bg: #0a0e14;
+    --bg-panel: #0e131c;
+    --bg-elevated: #141a24;
+    --border: #202838;
+    --text: #cbd5e1;
+    --text-dim: #64748b;
+    --text-bright: #e2e8f0;
+    --cyan: #22d3ee;
+    --cyan-dim: #0e7490;
+    --gold: #eab308;
+    --green: #34d399;
+    --red: #f87171;
+    --mono: ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", Menlo, monospace;
+    --sans: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+  a { color: var(--cyan); }
+  .wrap { max-width: 1100px; margin: 0 auto; padding: 0 20px; }
+
+  header {
+    border-bottom: 1px solid var(--border);
+    background: linear-gradient(180deg, #0c111a 0%, var(--bg) 100%);
+    padding: 22px 0 16px;
+  }
+  header h1 {
+    margin: 0;
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--text-bright);
+    letter-spacing: -0.01em;
+  }
+  header .subtitle {
+    margin: 4px 0 12px;
+    color: var(--text-dim);
+    font-size: 0.9rem;
+  }
+  header .meta-row {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+    font-family: var(--mono);
+    font-size: 0.8rem;
+  }
+  .badge {
+    display: inline-block;
+    padding: 4px 10px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    letter-spacing: 0.02em;
+    border: 1px solid transparent;
+  }
+  .badge-pending { background: #1e2531; color: var(--text-dim); border-color: var(--border); }
+  .badge-pass { background: rgba(52, 211, 153, 0.12); color: var(--green); border-color: rgba(52, 211, 153, 0.4); }
+  .badge-fail { background: rgba(248, 113, 113, 0.12); color: var(--red); border-color: rgba(248, 113, 113, 0.4); }
+  .snapshot-date { color: var(--text-dim); }
+  .snapshot-date b { color: var(--cyan); font-weight: 600; }
+
+  nav.tabs {
+    display: flex;
+    gap: 4px;
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-panel);
+    position: sticky;
+    top: 0;
+    z-index: 5;
+  }
+  nav.tabs .wrap { display: flex; gap: 4px; }
+  nav.tabs button {
+    background: none;
+    border: none;
+    border-bottom: 2px solid transparent;
+    color: var(--text-dim);
+    font-family: var(--sans);
+    font-size: 0.92rem;
+    font-weight: 500;
+    padding: 12px 16px;
+    cursor: pointer;
+  }
+  nav.tabs button:hover { color: var(--text-bright); }
+  nav.tabs button.active { color: var(--cyan); border-bottom-color: var(--cyan); }
+
+  main { padding: 24px 0 48px; }
+  .tab-panel { display: none; }
+  .tab-panel.active { display: block; }
+
+  h2 { color: var(--text-bright); font-size: 1.1rem; margin: 0 0 4px; }
+  .panel-note { color: var(--text-dim); font-size: 0.85rem; margin: 0 0 18px; max-width: 70ch; }
+
+  .grid-2 { display: grid; grid-template-columns: 340px 1fr; gap: 24px; align-items: start; }
+  @media (max-width: 860px) { .grid-2 { grid-template-columns: 1fr; } }
+
+  .panel {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px 20px;
+  }
+
+  .control-row { margin-bottom: 16px; }
+  .control-row label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.82rem;
+    color: var(--text-dim);
+    margin-bottom: 4px;
+  }
+  .control-row label .val { color: var(--cyan); font-family: var(--mono); }
+  .control-row input[type="range"] {
+    width: 100%;
+    accent-color: var(--cyan);
+    background: transparent;
+  }
+
+  .toggle-group { display: flex; gap: 6px; margin-bottom: 16px; }
+  .toggle-group button {
+    flex: 1;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    padding: 7px 10px;
+    font-family: var(--sans);
+    font-size: 0.82rem;
+    border-radius: 5px;
+    cursor: pointer;
+  }
+  .toggle-group button.active {
+    color: #0a0e14;
+    background: var(--cyan);
+    border-color: var(--cyan);
+    font-weight: 600;
+  }
+
+  table.readout { width: 100%; border-collapse: collapse; font-family: var(--mono); font-size: 0.86rem; }
+  table.readout th, table.readout td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border); }
+  table.readout th { color: var(--text-dim); font-weight: 500; }
+  table.readout td.num { text-align: right; color: var(--text-bright); }
+  table.readout tr.note td { color: var(--text-dim); font-style: italic; }
+
+  canvas { display: block; width: 100%; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 6px; }
+  .chart-block { margin-top: 18px; }
+  .chart-caption { color: var(--text-dim); font-size: 0.78rem; margin-top: 6px; }
+
+  .conv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  @media (max-width: 860px) { .conv-grid { grid-template-columns: 1fr; } }
+
+  .smile-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; }
+  @media (max-width: 860px) { .smile-grid { grid-template-columns: 1fr; } }
+
+  .legend { display: flex; flex-wrap: wrap; gap: 10px; font-size: 0.76rem; color: var(--text-dim); margin-top: 8px; font-family: var(--mono); }
+  .legend .swatch { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 4px; vertical-align: -1px; }
+
+  .footnote {
+    margin-top: 20px;
+    padding: 12px 14px;
+    background: var(--bg-elevated);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-family: var(--mono);
+    font-size: 0.78rem;
+    color: var(--text-dim);
+  }
+  .footnote b { color: var(--gold); }
+
+  footer {
+    border-top: 1px solid var(--border);
+    padding: 18px 0 40px;
+    color: var(--text-dim);
+    font-size: 0.78rem;
+  }
+  footer .wrap { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <h1>Options Pricing Engine</h1>
+    <p class="subtitle">Black-Scholes, CRR binomial trees, and Monte Carlo pricing &mdash; verified live against a golden reference table on every load.</p>
+    <div class="meta-row">
+      <span id="badge" class="badge badge-pending">SELF-CHECK RUNNING&hellip;</span>
+      <span class="snapshot-date">SPY snapshot: <b id="snapshot-date">&mdash;</b></span>
+    </div>
+  </div>
+</header>
+
+<nav class="tabs">
+  <div class="wrap">
+    <button type="button" class="tab-btn active" data-tab="pricer">Pricer</button>
+    <button type="button" class="tab-btn" data-tab="convergence">Convergence</button>
+    <button type="button" class="tab-btn" data-tab="smile">Market smile</button>
+  </div>
+</nav>
+
+<main class="wrap">
+
+  <!-- ===================== PRICER TAB ===================== -->
+  <section id="tab-pricer" class="tab-panel active">
+    <h2>Pricer</h2>
+    <p class="panel-note">Move the sliders to price a vanilla option under Black-Scholes (European, closed form) and a CRR binomial tree (N=500, European or American). Greeks are closed-form for European options and central finite-difference on the tree for American ones.</p>
+
+    <div class="grid-2">
+      <div class="panel" id="controls">
+        <div class="toggle-group" id="toggle-kind">
+          <button type="button" data-value="call" class="active">Call</button>
+          <button type="button" data-value="put">Put</button>
+        </div>
+        <div class="toggle-group" id="toggle-exercise">
+          <button type="button" data-value="european" class="active">European</button>
+          <button type="button" data-value="american">American</button>
+        </div>
+
+        <div class="control-row">
+          <label>S &mdash; spot <span class="val" id="val-S">100.00</span></label>
+          <input type="range" id="sld-S" min="50" max="200" step="0.5" value="100">
+        </div>
+        <div class="control-row">
+          <label>K &mdash; strike <span class="val" id="val-K">100.00</span></label>
+          <input type="range" id="sld-K" min="50" max="200" step="0.5" value="100">
+        </div>
+        <div class="control-row">
+          <label>&sigma; &mdash; volatility <span class="val" id="val-sigma">20.0%</span></label>
+          <input type="range" id="sld-sigma" min="0.01" max="1.0" step="0.005" value="0.2">
+        </div>
+        <div class="control-row">
+          <label>T &mdash; time to expiry <span class="val" id="val-T">1.00y</span></label>
+          <input type="range" id="sld-T" min="0.02" max="3" step="0.01" value="1.0">
+        </div>
+        <div class="control-row">
+          <label>r &mdash; risk-free rate <span class="val" id="val-r">5.00%</span></label>
+          <input type="range" id="sld-r" min="0" max="0.10" step="0.001" value="0.05">
+        </div>
+        <div class="control-row">
+          <label>q &mdash; dividend yield <span class="val" id="val-q">0.00%</span></label>
+          <input type="range" id="sld-q" min="0" max="0.05" step="0.001" value="0">
+        </div>
+      </div>
+
+      <div>
+        <div class="panel">
+          <table class="readout">
+            <thead>
+              <tr><th></th><th class="num">Black-Scholes</th><th class="num">Tree (N=500)</th></tr>
+            </thead>
+            <tbody id="readout-body">
+              <tr><td>Price</td><td class="num" id="out-bs-price">&mdash;</td><td class="num" id="out-tree-price">&mdash;</td></tr>
+              <tr class="note" id="out-bs-note" style="display:none"><td colspan="3">n/a &mdash; use tree (American exercise has no closed form)</td></tr>
+              <tr><td>Delta</td><td class="num" id="out-delta" colspan="2"></td></tr>
+              <tr><td>Gamma</td><td class="num" id="out-gamma" colspan="2"></td></tr>
+              <tr><td>Vega <span style="color:var(--text-dim)">(per 1.0 vol)</span></td><td class="num" id="out-vega" colspan="2"></td></tr>
+              <tr><td>Theta <span style="color:var(--text-dim)">(per year)</span></td><td class="num" id="out-theta" colspan="2"></td></tr>
+              <tr><td>Rho <span style="color:var(--text-dim)">(per 1.0 rate)</span></td><td class="num" id="out-rho" colspan="2"></td></tr>
+            </tbody>
+          </table>
+          <p class="chart-caption" id="greeks-source">Greeks: closed-form Black-Scholes (European).</p>
+        </div>
+
+        <div class="chart-block panel">
+          <canvas id="canvas-payoff" width="640" height="320" aria-label="Payoff and model value vs spot"></canvas>
+          <p class="chart-caption">Gold: intrinsic payoff at expiry. Cyan: current model value across spot, at the sliders' K, T, &sigma;, r, q.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ===================== CONVERGENCE TAB ===================== -->
+  <section id="tab-convergence" class="tab-panel">
+    <h2>Convergence</h2>
+    <p class="panel-note">Two independent numerical methods approach the same Black-Scholes European call price (S=K=100, T=1y, r=5%, &sigma;=20%, q=0) as their resolution parameter grows. Both axes are log-scaled so the convergence rate reads off as a slope.</p>
+
+    <div class="conv-grid">
+      <div class="chart-block panel">
+        <canvas id="canvas-mc" width="480" height="340" aria-label="Monte Carlo convergence"></canvas>
+        <p class="chart-caption">Monte Carlo: error vs number of simulated paths (single seed = 5).</p>
+      </div>
+      <div class="chart-block panel">
+        <canvas id="canvas-tree" width="480" height="340" aria-label="Tree convergence"></canvas>
+        <p class="chart-caption">CRR tree: error vs number of steps.</p>
+      </div>
+    </div>
+
+    <p class="panel-note" style="margin-top:18px;">
+      Honest read: Monte Carlo error shrinks like 1/&radic;N &mdash; a 100&times; increase in paths only buys one extra decimal digit of accuracy, and this is a single random seed, so the curve is not perfectly smooth. The CRR tree converges roughly like 1/N (one order of magnitude faster per step added) but oscillates slightly because CRR's error alternates sign depending on whether a tree layer straddles the strike &mdash; neither method is "better" in the abstract, they trade off determinism, speed, and applicability to American exercise.
+    </p>
+  </section>
+
+  <!-- ===================== MARKET SMILE TAB ===================== -->
+  <section id="tab-smile" class="tab-panel">
+    <h2>Market smile</h2>
+    <p class="panel-note">Implied volatility recovered from a real SPY option chain snapshot by Brent's method inversion of Black-Scholes, after a quality filter (liquid quotes only).</p>
+
+    <div class="smile-grid">
+      <div class="chart-block panel">
+        <canvas id="canvas-smile" width="480" height="340" aria-label="IV smile by moneyness"></canvas>
+        <div class="legend" id="smile-legend"></div>
+      </div>
+      <div class="chart-block panel">
+        <canvas id="canvas-term" width="480" height="340" aria-label="ATM term structure"></canvas>
+        <p class="chart-caption">At-the-money IV vs days to expiry, across all filtered expiries.</p>
+      </div>
+    </div>
+
+    <div class="footnote" id="smile-footnote"></div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Prices are model values, not advice.</span>
+    <span>Snapshot: <span id="footer-date">&mdash;</span> &middot; <a id="repo-link" href="https://github.com/aleks-drozy/options-pricing-engine" target="_blank" rel="noopener noreferrer">Source on GitHub</a></span>
+  </div>
+</footer>
+
+<script>
+const GOLDEN = __GOLDEN__;
+const SMILE = __SMILE__;
+const MC = __MC__;
+const META = __META__;
+
+/* ============================================================
+   MATH — mirrors engine/bs.py, engine/binomial.py exactly.
+   normCdf is Graeme West's double-precision cumulative normal
+   (Hart 1968 rational approximation), NOT Abramowitz-Stegun.
+   ============================================================ */
+
+function normCdf(x) {
+  const xAbs = Math.abs(x);
+  if (xAbs > 37) {
+    return x > 0 ? 1.0 : 0.0;
+  }
+  const exponential = Math.exp(-xAbs * xAbs / 2.0);
+  let build, sum;
+  if (xAbs < 7.07106781186547) {
+    build = 3.52624965998911e-02 * xAbs + 0.700383064443688;
+    build = build * xAbs + 6.37396220353165;
+    build = build * xAbs + 33.912866078383;
+    build = build * xAbs + 112.079291497871;
+    build = build * xAbs + 221.213596169931;
+    build = build * xAbs + 220.206867912376;
+    sum = exponential * build;
+    build = 8.83883476483184e-02 * xAbs + 1.75566716318264;
+    build = build * xAbs + 16.064177579207;
+    build = build * xAbs + 86.7807322029461;
+    build = build * xAbs + 296.564248779674;
+    build = build * xAbs + 637.333633378831;
+    build = build * xAbs + 793.826512519948;
+    build = build * xAbs + 440.413735824752;
+    sum = sum / build;
+  } else {
+    build = xAbs + 0.65;
+    build = xAbs + 4.0 / build;
+    build = xAbs + 3.0 / build;
+    build = xAbs + 2.0 / build;
+    build = xAbs + 1.0 / build;
+    sum = exponential / (build * 2.506628274631);
+  }
+  return x > 0.0 ? 1.0 - sum : sum;
+}
+
+const SQRT_2PI = Math.sqrt(2.0 * Math.PI);
+function normPdf(x) {
+  return Math.exp(-0.5 * x * x) / SQRT_2PI;
+}
+
+function validateInputs(S, K, T, sigma, kind) {
+  if (S <= 0 || K <= 0) throw new Error(`S and K must be positive (got S=${S}, K=${K})`);
+  if (T <= 0) throw new Error(`T must be positive (got ${T})`);
+  if (sigma <= 0) throw new Error(`sigma must be positive (got ${sigma})`);
+  if (kind !== 'call' && kind !== 'put') throw new Error(`kind must be call or put (got ${kind})`);
+}
+
+function d1d2(S, K, T, r, sigma, q) {
+  const srt = sigma * Math.sqrt(T);
+  const d1 = (Math.log(S / K) + (r - q + 0.5 * sigma * sigma) * T) / srt;
+  return [d1, d1 - srt];
+}
+
+function bsPrice(S, K, T, r, sigma, q, kind) {
+  validateInputs(S, K, T, sigma, kind);
+  const [d1, d2] = d1d2(S, K, T, r, sigma, q);
+  const dfQ = Math.exp(-q * T);
+  const dfR = Math.exp(-r * T);
+  if (kind === 'call') {
+    return S * dfQ * normCdf(d1) - K * dfR * normCdf(d2);
+  }
+  return K * dfR * normCdf(-d2) - S * dfQ * normCdf(-d1);
+}
+
+function bsGreeks(S, K, T, r, sigma, q, kind) {
+  validateInputs(S, K, T, sigma, kind);
+  const [d1, d2] = d1d2(S, K, T, r, sigma, q);
+  const dfQ = Math.exp(-q * T);
+  const dfR = Math.exp(-r * T);
+  const sqrtT = Math.sqrt(T);
+  const pdf1 = normPdf(d1);
+  const gamma = dfQ * pdf1 / (S * sigma * sqrtT);
+  const vega = S * dfQ * pdf1 * sqrtT;
+  const commonTheta = -S * dfQ * pdf1 * sigma / (2.0 * sqrtT);
+  let delta, theta, rho;
+  if (kind === 'call') {
+    delta = dfQ * normCdf(d1);
+    theta = commonTheta + q * S * dfQ * normCdf(d1) - r * K * dfR * normCdf(d2);
+    rho = K * T * dfR * normCdf(d2);
+  } else {
+    delta = dfQ * (normCdf(d1) - 1.0);
+    theta = commonTheta - q * S * dfQ * normCdf(-d1) + r * K * dfR * normCdf(-d2);
+    rho = -K * T * dfR * normCdf(-d2);
+  }
+  return { delta, gamma, vega, theta, rho };
+}
+
+function crrPrice(S, K, T, r, sigma, q, kind, american, steps) {
+  validateInputs(S, K, T, sigma, kind);
+  if (steps < 1) throw new Error(`steps must be >= 1 (got ${steps})`);
+  const dt = T / steps;
+  const u = Math.exp(sigma * Math.sqrt(dt));
+  const d = 1.0 / u;
+  const a = Math.exp((r - q) * dt);
+  const p = (a - d) / (u - d);
+  if (!(p > 0.0 && p < 1.0)) {
+    throw new Error(`CRR risk-neutral probability ${p.toFixed(4)} outside (0,1); invalid parameter regime`);
+  }
+  const disc = Math.exp(-r * dt);
+  const sign = kind === 'call' ? 1.0 : -1.0;
+
+  let values = new Float64Array(steps + 1);
+  for (let j = 0; j <= steps; j++) {
+    const ST = S * Math.pow(u, j) * Math.pow(d, steps - j);
+    values[j] = Math.max(sign * (ST - K), 0.0);
+  }
+  for (let i = steps; i >= 1; i--) {
+    const next = new Float64Array(i);
+    for (let j = 0; j < i; j++) {
+      next[j] = disc * (p * values[j + 1] + (1.0 - p) * values[j]);
+    }
+    if (american) {
+      for (let j = 0; j < i; j++) {
+        const Si = S * Math.pow(u, j) * Math.pow(d, (i - 1) - j);
+        next[j] = Math.max(next[j], Math.max(sign * (Si - K), 0.0));
+      }
+    }
+    values = next;
+  }
+  return values[0];
+}
+
+function crrGreeks(S, K, T, r, sigma, q, kind, american, steps) {
+  const price = (over) => {
+    const p = Object.assign({ S, K, T, r, sigma, q }, over);
+    return crrPrice(p.S, p.K, p.T, p.r, p.sigma, p.q, kind, american, steps);
+  };
+  const hS = 0.005 * S;
+  const hSig = 1e-3;
+  const hR = 1e-4;
+  const hT = Math.min(1e-3, T / 10.0);
+  const base = price({});
+  const upS = price({ S: S + hS });
+  const dnS = price({ S: S - hS });
+  return {
+    delta: (upS - dnS) / (2 * hS),
+    gamma: (upS - 2 * base + dnS) / (hS * hS),
+    vega: (price({ sigma: sigma + hSig }) - price({ sigma: sigma - hSig })) / (2 * hSig),
+    theta: -(price({ T: T + hT }) - price({ T: T - hT })) / (2 * hT),
+    rho: (price({ r: r + hR }) - price({ r: r - hR })) / (2 * hR),
+  };
+}
+
+/* ============================================================
+   SELF-CHECK — runs once on load against all 24 GOLDEN.cases.
+   No silent pass: badge always reflects the actual outcome.
+   ============================================================ */
+
+function runSelfCheck() {
+  const badge = document.getElementById('badge');
+  try {
+    let worstBs = 0, worstBsCase = null;
+    let worstTree = 0, worstTreeCase = null;
+    for (const c of GOLDEN.cases) {
+      if (c.bs !== null) {
+        const jsBs = bsPrice(c.S, c.K, c.T, c.r, c.sigma, c.q, c.kind);
+        const rel = Math.abs(jsBs - c.bs) / Math.abs(c.bs);
+        if (rel > worstBs) { worstBs = rel; worstBsCase = c.id; }
+      }
+      const jsTree = crrPrice(c.S, c.K, c.T, c.r, c.sigma, c.q, c.kind, c.american, GOLDEN.tree_steps);
+      const relT = Math.abs(jsTree - c.tree500) / Math.abs(c.tree500);
+      if (relT > worstTree) { worstTree = relT; worstTreeCase = c.id; }
+    }
+    const bsPass = worstBs < 1e-9;
+    const treePass = worstTree < 1e-6;
+    const n = GOLDEN.cases.length;
+    if (bsPass && treePass) {
+      badge.textContent = `SELF-CHECK PASS (${n}/${n})`;
+      badge.className = 'badge badge-pass';
+    } else {
+      const useBs = !bsPass;
+      const worstId = useBs ? worstBsCase : worstTreeCase;
+      const worstErr = useBs ? worstBs : worstTree;
+      badge.textContent = `SELF-CHECK FAIL — worst case ${worstId} rel err ${worstErr.toExponential(3)}`;
+      badge.className = 'badge badge-fail';
+    }
+    return bsPass && treePass;
+  } catch (err) {
+    badge.textContent = `SELF-CHECK FAIL — ${err.message}`;
+    badge.className = 'badge badge-fail';
+    return false;
+  }
+}
+
+/* ============================================================
+   UI — tabs, sliders, pricer readout, canvas charts.
+   ============================================================ */
+
+function fmt(x, d) {
+  if (x === null || x === undefined || Number.isNaN(x)) return '—';
+  return x.toFixed(d === undefined ? 4 : d);
+}
+
+function initTabs() {
+  const buttons = document.querySelectorAll('.tab-btn');
+  buttons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      buttons.forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById('tab-' + btn.dataset.tab).classList.add('active');
+    });
+  });
+}
+
+const state = { S: 100, K: 100, sigma: 0.2, T: 1.0, r: 0.05, q: 0.0, kind: 'call', american: false };
+
+const sliderCfg = [
+  { id: 'sld-S', key: 'S', out: 'val-S', fmt: v => v.toFixed(2) },
+  { id: 'sld-K', key: 'K', out: 'val-K', fmt: v => v.toFixed(2) },
+  { id: 'sld-sigma', key: 'sigma', out: 'val-sigma', fmt: v => (v * 100).toFixed(1) + '%' },
+  { id: 'sld-T', key: 'T', out: 'val-T', fmt: v => v.toFixed(2) + 'y' },
+  { id: 'sld-r', key: 'r', out: 'val-r', fmt: v => (v * 100).toFixed(2) + '%' },
+  { id: 'sld-q', key: 'q', out: 'val-q', fmt: v => (v * 100).toFixed(2) + '%' },
+];
+
+function initControls() {
+  sliderCfg.forEach(cfg => {
+    const el = document.getElementById(cfg.id);
+    const out = document.getElementById(cfg.out);
+    el.addEventListener('input', () => {
+      state[cfg.key] = parseFloat(el.value);
+      out.textContent = cfg.fmt(state[cfg.key]);
+      updatePricer();
+    });
+  });
+
+  function wireToggle(groupId, key, values) {
+    const group = document.getElementById(groupId);
+    const buttons = group.querySelectorAll('button');
+    buttons.forEach(btn => {
+      btn.addEventListener('click', () => {
+        buttons.forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        state[key] = values[btn.dataset.value];
+        updatePricer();
+      });
+    });
+  }
+  wireToggle('toggle-kind', 'kind', { call: 'call', put: 'put' });
+  wireToggle('toggle-exercise', 'american', { european: false, american: true });
+}
+
+function updatePricer() {
+  const { S, K, sigma, T, r, q, kind, american } = state;
+  const bsNote = document.getElementById('out-bs-note');
+  const bsPriceCell = document.getElementById('out-bs-price');
+  const treePriceCell = document.getElementById('out-tree-price');
+  const greeksSource = document.getElementById('greeks-source');
+
+  let tree;
+  try {
+    tree = crrPrice(S, K, T, r, sigma, q, kind, american, 500);
+    treePriceCell.textContent = fmt(tree, 4);
+  } catch (err) {
+    treePriceCell.textContent = 'n/a';
+    tree = null;
+  }
+
+  let greeks;
+  if (american) {
+    bsPriceCell.textContent = '';
+    bsNote.style.display = '';
+    greeksSource.textContent = 'Greeks: central finite-difference on the N=500 tree (American).';
+    try {
+      greeks = crrGreeks(S, K, T, r, sigma, q, kind, true, 500);
+    } catch (err) {
+      greeks = null;
+    }
+  } else {
+    bsNote.style.display = 'none';
+    try {
+      bsPriceCell.textContent = fmt(bsPrice(S, K, T, r, sigma, q, kind), 4);
+    } catch (err) {
+      bsPriceCell.textContent = 'n/a';
+    }
+    greeksSource.textContent = 'Greeks: closed-form Black-Scholes (European).';
+    try {
+      greeks = bsGreeks(S, K, T, r, sigma, q, kind);
+    } catch (err) {
+      greeks = null;
+    }
+  }
+
+  ['delta', 'gamma', 'vega', 'theta', 'rho'].forEach(g => {
+    document.getElementById('out-' + g).textContent = greeks ? fmt(greeks[g], 5) : 'n/a';
+  });
+
+  drawPayoffChart();
+}
+
+/* ---------- canvas helpers ---------- */
+
+function setupCanvas(canvas) {
+  const dpr = window.devicePixelRatio || 1;
+  const cssW = canvas.clientWidth || canvas.width;
+  const cssH = canvas.clientHeight || canvas.height;
+  canvas.width = cssW * dpr;
+  canvas.height = cssH * dpr;
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  return { ctx, w: cssW, h: cssH };
+}
+
+function clear(ctx, w, h) {
+  ctx.clearRect(0, 0, w, h);
+}
+
+const PAD = { l: 52, r: 16, t: 16, b: 36 };
+
+function drawLinearAxes(ctx, w, h, xLabel, yLabel) {
+  ctx.strokeStyle = '#202838';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(PAD.l, PAD.t);
+  ctx.lineTo(PAD.l, h - PAD.b);
+  ctx.lineTo(w - PAD.r, h - PAD.b);
+  ctx.stroke();
+  ctx.fillStyle = '#64748b';
+  ctx.font = '11px ' + getComputedStyle(document.body).fontFamily;
+  ctx.textAlign = 'center';
+  ctx.fillText(xLabel, (PAD.l + w - PAD.r) / 2, h - 6);
+  ctx.save();
+  ctx.translate(14, (PAD.t + h - PAD.b) / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillText(yLabel, 0, 0);
+  ctx.restore();
+}
+
+function px(x, xMin, xMax, w) {
+  return PAD.l + (x - xMin) / (xMax - xMin) * (w - PAD.l - PAD.r);
+}
+function py(y, yMin, yMax, h) {
+  return (h - PAD.b) - (y - yMin) / (yMax - yMin) * (h - PAD.b - PAD.t);
+}
+
+function drawPayoffChart() {
+  const canvas = document.getElementById('canvas-payoff');
+  const { ctx, w, h } = setupCanvas(canvas);
+  clear(ctx, w, h);
+  const { K, sigma, T, r, q, kind, american } = state;
+  const sMin = 50, sMax = 200;
+  const n = 120;
+  const payoff = [];
+  const model = [];
+  for (let i = 0; i <= n; i++) {
+    const S = sMin + (sMax - sMin) * i / n;
+    const intrinsic = kind === 'call' ? Math.max(S - K, 0) : Math.max(K - S, 0);
+    payoff.push([S, intrinsic]);
+    try {
+      const v = american
+        ? crrPrice(S, K, T, r, sigma, q, kind, true, 200)
+        : bsPrice(S, K, T, r, sigma, q, kind);
+      model.push([S, v]);
+    } catch (err) { /* skip invalid point */ }
+  }
+  const allY = payoff.map(p => p[1]).concat(model.map(p => p[1]));
+  const yMax = Math.max(...allY) * 1.1 || 1;
+
+  drawLinearAxes(ctx, w, h, 'Spot S', 'Value');
+
+  ctx.strokeStyle = '#eab308';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  payoff.forEach(([S, v], i) => {
+    const x = px(S, sMin, sMax, w), y = py(v, 0, yMax, h);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  ctx.strokeStyle = '#22d3ee';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  model.forEach(([S, v], i) => {
+    const x = px(S, sMin, sMax, w), y = py(v, 0, yMax, h);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  const cx = px(state.S, sMin, sMax, w);
+  ctx.strokeStyle = '#3b4457';
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath();
+  ctx.moveTo(cx, PAD.t);
+  ctx.lineTo(cx, h - PAD.b);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function logTicks(min, max) {
+  const ticks = [];
+  let p = Math.floor(Math.log10(min));
+  const pMax = Math.ceil(Math.log10(max));
+  for (; p <= pMax; p++) ticks.push(Math.pow(10, p));
+  return ticks;
+}
+
+function drawLogLogChart(canvasId, points, refSlope, xLabel, yLabel, color) {
+  const canvas = document.getElementById(canvasId);
+  const { ctx, w, h } = setupCanvas(canvas);
+  clear(ctx, w, h);
+
+  const xs = points.map(p => p[0]);
+  const ys = points.map(p => Math.max(p[1], 1e-16));
+  const xMin = Math.min(...xs), xMax = Math.max(...xs);
+  const yMin = Math.min(...ys) * 0.5, yMax = Math.max(...ys) * 2;
+  const lx = v => Math.log10(v), ly = v => Math.log10(v);
+  const lxMin = lx(xMin), lxMax = lx(xMax), lyMin = ly(yMin), lyMax = ly(yMax);
+
+  drawLinearAxes(ctx, w, h, xLabel, yLabel);
+
+  ctx.fillStyle = '#64748b';
+  ctx.font = '10px ' + getComputedStyle(document.body).fontFamily;
+  ctx.textAlign = 'center';
+  logTicks(xMin, xMax).forEach(t => {
+    const x = px(lx(t), lxMin, lxMax, w);
+    ctx.fillText(t >= 1000 ? t.toExponential(0) : String(t), x, h - PAD.b + 14);
+  });
+  ctx.textAlign = 'right';
+  logTicks(yMin, yMax).forEach(t => {
+    const y = py(ly(t), lyMin, lyMax, h);
+    ctx.fillText(t.toExponential(0), PAD.l - 6, y + 3);
+  });
+
+  // reference slope line anchored at the first point
+  const [x0, y0raw] = points[0];
+  const y0 = Math.max(y0raw, 1e-16);
+  ctx.strokeStyle = '#3b4457';
+  ctx.setLineDash([4, 4]);
+  ctx.beginPath();
+  [xMin, xMax].forEach((xv, i) => {
+    const yv = y0 * Math.pow(xv / x0, refSlope);
+    const x = px(lx(xv), lxMin, lxMax, w);
+    const y = py(ly(Math.max(yv, 1e-16)), lyMin, lyMax, h);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  ctx.strokeStyle = color;
+  ctx.fillStyle = color;
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  points.forEach(([xv, yv], i) => {
+    const x = px(lx(xv), lxMin, lxMax, w);
+    const y = py(ly(Math.max(yv, 1e-16)), lyMin, lyMax, h);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(x, y, 2.5, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.restore();
+  });
+  ctx.stroke();
+}
+
+function drawConvergenceCharts() {
+  const base = MC.base;
+  const trueBs = bsPrice(base.S, base.K, base.T, base.r, base.sigma, base.q, MC.kind);
+
+  const mcPoints = MC.rows.map(row => [row.n, Math.abs(row.price - trueBs)]);
+  drawLogLogChart('canvas-mc', mcPoints, -0.5, 'N paths (log)', '|error| (log)', '#22d3ee');
+
+  const steps = [10, 20, 50, 100, 200, 500, 1000];
+  const treePoints = steps.map(n => {
+    const p = crrPrice(base.S, base.K, base.T, base.r, base.sigma, base.q, MC.kind, false, n);
+    return [n, Math.abs(p - trueBs)];
+  });
+  drawLogLogChart('canvas-tree', treePoints, -1.0, 'N steps (log)', '|error| (log)', '#eab308');
+}
+
+/* ---------- market smile ---------- */
+
+const SMILE_COLORS = ['#22d3ee', '#eab308', '#f87171', '#a78bfa'];
+
+function pickSmileExpiries() {
+  const all = SMILE.per_expiry.filter(e => e.points.some(p => p.iv !== null));
+  const nPick = Math.min(4, all.length);
+  if (nPick === 0) return [];
+  const idx = [];
+  for (let i = 0; i < nPick; i++) {
+    idx.push(Math.round(i * (all.length - 1) / Math.max(1, nPick - 1)));
+  }
+  return [...new Set(idx)].map(i => all[i]);
+}
+
+function drawSmileChart() {
+  const canvas = document.getElementById('canvas-smile');
+  const { ctx, w, h } = setupCanvas(canvas);
+  clear(ctx, w, h);
+  const chosen = pickSmileExpiries();
+
+  const allIv = [];
+  const allM = [];
+  chosen.forEach(e => e.points.forEach(p => { if (p.iv !== null) { allIv.push(p.iv * 100); allM.push(p.moneyness); } }));
+  if (allM.length === 0) return;
+  const mMin = Math.min(...allM), mMax = Math.max(...allM);
+  const ivMin = 0, ivMax = Math.max(...allIv) * 1.1;
+
+  drawLinearAxes(ctx, w, h, 'Moneyness K/S', 'IV %');
+  ctx.strokeStyle = '#3b4457';
+  ctx.setLineDash([3, 3]);
+  const atmX = px(1.0, mMin, mMax, w);
+  ctx.beginPath(); ctx.moveTo(atmX, PAD.t); ctx.lineTo(atmX, h - PAD.b); ctx.stroke();
+  ctx.setLineDash([]);
+
+  const legend = document.getElementById('smile-legend');
+  legend.innerHTML = '';
+  chosen.forEach((e, i) => {
+    const color = SMILE_COLORS[i % SMILE_COLORS.length];
+    ctx.fillStyle = color;
+    e.points.forEach(p => {
+      if (p.iv === null) return;
+      const x = px(p.moneyness, mMin, mMax, w);
+      const y = py(p.iv * 100, ivMin, ivMax, h);
+      ctx.beginPath();
+      ctx.arc(x, y, 2.2, 0, Math.PI * 2);
+      ctx.fill();
+    });
+    const sw = document.createElement('span');
+    sw.innerHTML = `<span class="swatch" style="background:${color}"></span>${e.dte}d (${e.expiry})`;
+    legend.appendChild(sw);
+  });
+}
+
+function drawTermChart() {
+  const canvas = document.getElementById('canvas-term');
+  const { ctx, w, h } = setupCanvas(canvas);
+  clear(ctx, w, h);
+  const term = SMILE.term_structure;
+  if (term.length === 0) return;
+  const dtes = term.map(t => t.dte);
+  const ivs = term.map(t => t.atm_iv * 100);
+  const xMin = Math.min(...dtes), xMax = Math.max(...dtes);
+  const yMin = Math.min(...ivs) * 0.9, yMax = Math.max(...ivs) * 1.1;
+
+  drawLinearAxes(ctx, w, h, 'Days to expiry', 'ATM IV %');
+  ctx.strokeStyle = '#22d3ee';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  term.forEach((t, i) => {
+    const x = px(t.dte, xMin, xMax, w), y = py(t.atm_iv * 100, yMin, yMax, h);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+  ctx.fillStyle = '#22d3ee';
+  term.forEach(t => {
+    const x = px(t.dte, xMin, xMax, w), y = py(t.atm_iv * 100, yMin, yMax, h);
+    ctx.beginPath(); ctx.arc(x, y, 2.5, 0, Math.PI * 2); ctx.fill();
+  });
+}
+
+function renderSmileFootnote() {
+  const c = META.filter_counts;
+  document.getElementById('smile-footnote').innerHTML =
+    `<b>Filter counts</b> (dropped quotes are counted, not hidden): total ${c.total}, kept ${c.kept}, ` +
+    `dropped for no bid/ask ${c.no_bid_or_ask}, wide spread ${c.wide_spread}, moneyness out of range ${c.moneyness}, ` +
+    `DTE out of range ${c.dte}. IV inversion failures: ${META.iv_failures}.`;
+}
+
+/* ---------- boot ---------- */
+
+function renderMeta() {
+  const d = META.fetched_utc;
+  document.getElementById('snapshot-date').textContent = d;
+  document.getElementById('footer-date').textContent = d;
+}
+
+window.addEventListener('DOMContentLoaded', () => {
+  runSelfCheck();
+  renderMeta();
+  initTabs();
+  initControls();
+  updatePricer();
+  drawConvergenceCharts();
+  drawSmileChart();
+  drawTermChart();
+  renderSmileFootnote();
+});
+
+window.addEventListener('resize', () => {
+  updatePricer();
+  drawConvergenceCharts();
+  drawSmileChart();
+  drawTermChart();
+});
+</script>
+</body>
+</html>
