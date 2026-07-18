@@ -2,7 +2,7 @@
 from engine.binomial import crr_price
 from validation.grid import PARAM_GRID
 
-NOARB_SAMPLE_STRIDE = 5
+NOARB_SAMPLE_STRIDE = 7  # coprime with the grid's r/q period (5) so r,q>0 points get sampled
 
 
 def run() -> dict:

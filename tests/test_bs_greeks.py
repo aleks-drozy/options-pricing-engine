@@ -43,6 +43,22 @@ def test_gamma_matches_second_fd():
     assert bs_greeks(**CASE)["gamma"] == pytest.approx(second, rel=1e-5)
 
 
+@pytest.mark.parametrize("kind", ["call", "put"])
+def test_greeks_match_fd_with_dividend_yield(kind):
+    # q > 0 exercises the e^{-qT} terms that a q=0 case leaves untested.
+    case = dict(CASE, q=0.02)
+
+    def fdq(param, h):
+        up = dict(case); dn = dict(case)
+        up[param] += h; dn[param] -= h
+        return (bs_price(kind=kind, **up) - bs_price(kind=kind, **dn)) / (2 * h)
+
+    g = bs_greeks(kind=kind, **case)
+    assert g["delta"] == pytest.approx(fdq("S", 1e-4), rel=1e-6)
+    assert g["vega"] == pytest.approx(fdq("sigma", 1e-5), rel=1e-6)
+    assert g["theta"] == pytest.approx(-fdq("T", 1e-6), rel=1e-5)
+
+
 def test_call_delta_bounds_and_put_call_delta_relation():
     import math
     g_c = bs_greeks(kind="call", **CASE)["delta"]

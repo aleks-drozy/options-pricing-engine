@@ -1,0 +1,65 @@
+{
+  "generated_by": "run_validate.py",
+  "gates": [
+    {
+      "gate": "parity_closed_form",
+      "passed": true,
+      "worst_bs_gap": 2.842170943040401e-14
+    },
+    {
+      "gate": "parity_mc",
+      "passed": true,
+      "mc_points": 16,
+      "mc_failures": 0
+    },
+    {
+      "gate": "convergence",
+      "passed": true,
+      "tree_failures": [],
+      "mc_1m_error": 0.008578314612659454,
+      "mc_1m_se": 0.01472422825136964,
+      "mc_ci_coverage": 0.95
+    },
+    {
+      "gate": "greeks",
+      "passed": true,
+      "worst_rel_error": 5.5672074995664745e-06,
+      "american_put_tree_greeks": {
+        "delta": -0.4115553608416471,
+        "gamma": 0.05127099092853982,
+        "vega": 37.47779396740647,
+        "theta": -2.237290100550293,
+        "rho": -30.21022462357248
+      },
+      "abs_rescued": 0
+    },
+    {
+      "gate": "no_arbitrage",
+      "passed": true,
+      "violations": [],
+      "worst_q0_call_gap": 4.547473508864641e-13
+    },
+    {
+      "gate": "iv_roundtrip_synthetic",
+      "passed": true,
+      "worst_error": 8.421041641781812e-13
+    },
+    {
+      "gate": "iv_snapshot",
+      "passed": true,
+      "kept_quotes": 3587,
+      "resolved": 3485,
+      "resolution_rate": 0.9715639810426541,
+      "iv_failures": 102,
+      "filter_counts": {
+        "total": 3755,
+        "kept": 3587,
+        "no_bid_or_ask": 116,
+        "wide_spread": 0,
+        "moneyness": 52,
+        "dte": 0
+      }
+    }
+  ],
+  "all_passed": true
+}

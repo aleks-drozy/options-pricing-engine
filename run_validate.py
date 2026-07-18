@@ -4,7 +4,7 @@ import sys
 from pathlib import Path
 
 from engine.bs import bs_price
-from engine.iv import IVError, implied_vol
+from engine.iv import implied_vol
 from market.smile import compute_smile
 from market.snapshot import filter_quotes, load_snapshot
 from validation.convergence import run as convergence_run
@@ -33,8 +33,13 @@ def iv_snapshot_gate() -> dict:
     smile = compute_smile(snap)
     resolved = sum(1 for e in smile["per_expiry"] for p in e["points"] if p["iv"] is not None)
     accounted = resolved + smile["iv_failures"] == len(kept)
-    return {"gate": "iv_snapshot", "passed": accounted, "kept_quotes": len(kept),
-            "resolved": resolved, "iv_failures": smile["iv_failures"], "filter_counts": counts}
+    # Accounting alone is tautological (resolved + failures always sums to kept);
+    # also require that at least 80% of kept quotes actually resolve to an IV.
+    resolution_rate = resolved / len(kept) if kept else 0.0
+    return {"gate": "iv_snapshot", "passed": accounted and resolution_rate >= 0.80,
+            "kept_quotes": len(kept), "resolved": resolved,
+            "resolution_rate": resolution_rate,
+            "iv_failures": smile["iv_failures"], "filter_counts": counts}
 
 
 def main() -> int:

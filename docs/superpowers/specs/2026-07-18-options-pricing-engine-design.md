@@ -143,3 +143,4 @@ fails; README badge states the gate result honestly.
 ## Amendments
 
 - 2026-07-18 (build, Task 7): Gate 5 criterion amended to rel < 1e-4 OR abs < 1e-8 (far-OTM greeks ~1e-6 make the FD reference cancellation-noise-dominated). Gate 3 monotonicity waived below a 1e-9 absolute noise floor (deep-ITM/short-T tree already exact to machine epsilon at 200 steps). Both discovered by the gate run itself; intent of both gates unchanged.
+- 2026-07-18 (final review, F1): gate sampling de-aliased from the r/q grid axis (strides 5/10 -> 7/13); this exposed CRR sawtooth oscillation at K=115 with r>0 that strict two-point monotonicity mis-scores — gate 3's shrinkage comparison amended to adjacent-step averages (N, N+1); raw absolute tolerance unchanged. Both the sampling hole and the oscillation were caught by the gates' own final review.

@@ -20,17 +20,17 @@ model assumes away. See [WRITEUP.md](WRITEUP.md) for the full finding.
 | # | Gate | Result |
 |---|---|---|
 | 1 | Put-call parity (BS closed form) | ✓ worst gap `2.84e-14` (< 1e-10) |
-| 2 | Put-call parity (Monte Carlo) | ✓ 20/20 grid points, 0 failures |
-| 3 | Tree → BS convergence | ✓ 0 failures; error shrinks N=200 → N=2000 |
+| 2 | Put-call parity (Monte Carlo) | ✓ 16/16 grid points, 0 failures |
+| 3 | Tree → BS convergence | ✓ 0 failures; averaged error shrinks N=200 → N=2000 |
 | 4 | MC → BS convergence | ✓ error `0.00858` vs SE `0.01472` at N=1e6; 95.0% CI coverage over 200 seeds |
-| 5 | Greeks (closed form vs FD) | ✓ worst rel. error `1.35e-4`; American tree Greeks sane |
+| 5 | Greeks (closed form vs FD) | ✓ worst rel. error `5.57e-6`; American tree Greeks sane |
 | 6 | No-arbitrage (American ≥ European) | ✓ 0 violations, worst `q=0` gap `4.55e-13` |
-| 7 | IV round-trip (synthetic + real SPY snapshot) | ✓ synthetic worst error `8.42e-13`; 3587 kept quotes, 3485 resolved + 102 counted failures |
+| 7 | IV round-trip (synthetic + real SPY snapshot) | ✓ synthetic worst error `8.42e-13`; 3587 kept quotes, 3485 resolved (97.2%) + 102 counted failures |
 
 Real numbers, regenerated from [`results/validation.json`](results/validation.json)
-by `run_validate.py` — not hand-typed. Two gate criteria were amended mid-build
-after the gate run itself surfaced noise-floor edge cases; see
-[WRITEUP.md](WRITEUP.md#4-limitations) for both, with rationale.
+by `run_validate.py` — not hand-typed. Three gate criteria have been amended
+after gate runs themselves surfaced numerical edge cases; see
+[WRITEUP.md](WRITEUP.md#4-limitations) for all three, with rationale.
 
 This is a **research project, not trading advice.**
 

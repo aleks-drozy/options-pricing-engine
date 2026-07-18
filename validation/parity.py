@@ -5,7 +5,7 @@ from engine.bs import bs_price
 from engine.montecarlo import mc_price
 from validation.grid import PARAM_GRID
 
-MC_SAMPLE_STRIDE = 10  # every 10th grid point for the MC leg (20 points)
+MC_SAMPLE_STRIDE = 13  # coprime with the grid's r/q period (5) so r,q>0 points get sampled
 
 
 def run() -> dict:

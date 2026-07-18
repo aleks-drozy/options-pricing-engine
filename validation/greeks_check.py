@@ -1,9 +1,13 @@
-"""Gate 5: closed-form Greeks match finite differences of bs_price; tree Greeks sane."""
+"""Gate 5: closed-form Greeks match finite differences of bs_price; tree Greeks sane.
+
+Amended criterion (see spec Amendments): a comparison passes when rel < 1e-4
+OR abs < 1e-8 - the absolute noise floor rescues far-OTM greeks (~1e-6) whose
+FD reference is cancellation-noise-dominated; rescues are counted, not hidden."""
 from engine.bs import bs_greeks, bs_price
 from engine.binomial import crr_greeks
 from validation.grid import PARAM_GRID
 
-GREEKS_SAMPLE_STRIDE = 10
+GREEKS_SAMPLE_STRIDE = 13  # coprime with the grid's r/q period (5) so r,q>0 points get sampled
 _BUMPS = {"delta": ("S", 1e-4), "vega": ("sigma", 1e-5), "rho": ("r", 1e-6)}
 
 

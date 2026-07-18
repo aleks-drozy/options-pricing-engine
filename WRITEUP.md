@@ -57,17 +57,19 @@ no-arbitrage bounds, or quotes brentq can't bracket a root for, raise
 | # | Gate | Pass criterion | Result |
 |---|---|---|---|
 | 1 | Put-call parity (BS) | `\|C - P - (S e^{-qT} - K e^{-rT})\| < 1e-10` across a 200-point grid | **PASS** — worst gap `2.84e-14` |
-| 2 | Put-call parity (MC) | parity gap < 3x combined std error, same grid | **PASS** — 20/20 sample points, 0 failures |
-| 3 | Tree -> BS convergence | error at N=2000 < error at N=200 (or below a 1e-9 noise floor), and `\|tree(2000) - BS\| < max(0.01, 0.1%*price)` | **PASS** — 0 failures across the sampled grid |
+| 2 | Put-call parity (MC) | parity gap < 3x combined std error, same grid | **PASS** — 16/16 sample points, 0 failures |
+| 3 | Tree -> BS convergence | adjacent-step-averaged error (mean of N, N+1 prices) at N=2000 < that at N=200 (or below a 1e-9 noise floor), and raw `\|tree(2000) - BS\| < max(0.01, 0.1%*price)` | **PASS** — 0 failures across the sampled grid |
 | 4 | MC -> BS convergence | at N=1e6, `\|MC - BS\| < 3*SE`; across 200 seeds at N=1e5, 95% CI covers BS >= 90% of runs | **PASS** — error `0.00858` vs SE `0.01472` at N=1e6; CI coverage **95.0%** over 200 seeds |
-| 5 | Greeks | BS closed form vs central FD: rel. err < 1e-4 OR abs. err < 1e-8; tree FD Greeks finite, delta in range | **PASS** — worst rel. error `1.35e-4`†, 1 comparison rescued by the absolute floor; American put tree Greeks sane (delta `-0.412`, gamma `0.051`, vega `37.48`, theta `-2.237`, rho `-30.21`) |
+| 5 | Greeks | BS closed form vs central FD: rel. err < 1e-4 OR abs. err < 1e-8; tree FD Greeks finite, delta in range | **PASS** — worst rel. error `5.57e-6`, 0 comparisons needed the absolute floor on the current sampling; American put tree Greeks sane (delta `-0.412`, gamma `0.051`, vega `37.48`, theta `-2.237`, rho `-30.21`) |
 | 6 | No-arbitrage | American >= European - 1e-9 everywhere; `q=0` => `\|Am call - Eu call\| < 1e-9` | **PASS** — 0 violations, worst `q=0` call gap `4.55e-13` |
-| 7 | IV round-trip | synthetic BS prices recover `sigma` within 1e-7; on the real SPY snapshot, every kept quote either resolves or is counted as a filtered failure | **PASS** — synthetic worst error `8.42e-13`; snapshot: 3587 kept, 3485 resolved, 102 counted failures, `3485 + 102 = 3587` |
+| 7 | IV round-trip | synthetic BS prices recover `sigma` within 1e-7; on the real SPY snapshot, every kept quote either resolves or is counted as a filtered failure, and >= 80% of kept quotes resolve | **PASS** — synthetic worst error `8.42e-13`; snapshot: 3587 kept, 3485 resolved (97.2%), 102 counted failures, `3485 + 102 = 3587` |
 
-†The gate 5 table shows the single worst comparison across every sampled
-`(param, kind)` combination. Most comparisons clear `1e-4` relative error
-comfortably; the ones that don't are far-OTM Greeks near `1e-6` in magnitude,
-where FD cancellation noise dominates a pure relative test (see §4).
+A final-review audit of the gates themselves caught that every sampling stride
+was a multiple of the parameter grid's r/q period — so the sampled gates had
+only ever seen `r=0, q=0` — and de-aliasing the strides immediately exposed a
+real CRR sawtooth oscillation at nonzero `r` that pointwise monotonicity
+mis-scores: the gates audit the engine, and auditing the gates found real
+things in both (see §4, third amendment).
 
 Full machine output: [`results/validation.json`](results/validation.json).
 
@@ -157,14 +159,15 @@ Charts: `charts/smile.png` (per-expiry smile + term structure),
   amount.
 - **American Greeks carry FD-on-tree noise.** `crr_greeks` (§1) uses central
   finite differences on the binomial tree rather than a closed form. Gate 5
-  needed an absolute-error floor to pass one far-OTM comparison (`abs_rescued:
-  1` in `results/validation.json`) because FD cancellation noise dominates a
-  pure relative-error test when the true Greek is tiny. Tree Greeks are
-  therefore reliable in magnitude and sign but noisier at the margins than the
-  BS closed form.
-- **Two gate criteria were amended after the first gate run**, both
-  discovered by running the gates themselves rather than decided in advance
-  (full text in the spec's Amendments section,
+  keeps an absolute-error floor (`rel < 1e-4 OR abs < 1e-8`) because FD
+  cancellation noise dominates a pure relative-error test when the true Greek
+  is tiny (far-OTM Greeks are ~1e-6 in magnitude); rescues are counted in
+  `results/validation.json` (`abs_rescued` — 0 on the current sampling). Tree
+  Greeks are therefore reliable in magnitude and sign but noisier at the
+  margins than the BS closed form.
+- **Three gate criteria have been amended after gate runs**, each discovered
+  by running (or auditing) the gates themselves rather than decided in
+  advance (full text in the spec's Amendments section,
   [`docs/superpowers/specs/2026-07-18-options-pricing-engine-design.md`](docs/superpowers/specs/2026-07-18-options-pricing-engine-design.md)):
   - **Gate 5 (Greeks):** amended from a pure relative-error criterion to
     `rel < 1e-4 OR abs < 1e-8`. Far-OTM Greeks are ~1e-6 in magnitude, which
@@ -178,9 +181,18 @@ Charts: `charts/smile.png` (per-expiry smile + term structure),
     epsilon at 200 steps, so "must strictly improve" has nothing left to
     measure — it was failing on rounding, not on the tree actually getting
     worse.
+  - **Gate 3 again (final review):** the gate samplers' strides were
+    multiples of the parameter grid's r/q period, so gates 2/3/5/6 had only
+    ever sampled `r=0, q=0` points. De-aliasing the strides (5/10 → 7/13,
+    coprime with the period) surfaced CRR's well-known sawtooth error
+    oscillation at `K=115` with `r>0`: the tree's error alternates phase as
+    the strike crosses tree layers, so pointwise monotonicity between two
+    arbitrary step counts mis-scores it. The shrinkage comparison now uses
+    adjacent-step averages (mean of the N and N+1 prices, standard
+    Broadie-Detemple-style smoothing); the raw absolute tolerance is
+    unchanged.
 
-  Both amendments were discovered by the gate run itself, and neither changes
-  what either gate is actually checking for.
+  None of the amendments changes what any gate is actually checking for.
 
 ## Links
 

@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- Repo root: `C:\Users\Alex\Projects\options-pricing-engine` (git repo exists; spec + this plan committed).
+- All work happens at the repo root (git repo exists; spec + this plan committed).
 - Tests NEVER touch the network. `scripts/fetch_chain.py` is manual-only, never imported by tests or CI.
 - All pricers take `(S, K, T, r, sigma, q=0.0, kind="call")` in that order; `kind` ∈ {"call","put"}; extra args after. Validate `S,K,sigma,T > 0`, `kind` valid → `ValueError`.
 - Continuous dividend yield `q` in every pricer.
@@ -1440,7 +1440,7 @@ if __name__ == "__main__":
 - [ ] **Step 3:** Full local green sweep: `python -m pytest && python run_validate.py` → exit 0.
 - [ ] **Step 4: Publish:** `gh repo create aleks-drozy/options-pricing-engine --public --source . --push`. Then enable Pages from `docs/` on main: `gh api -X POST repos/aleks-drozy/options-pricing-engine/pages -f "source[branch]=main" -f "source[path]=/docs"`. Watch CI: `gh run watch` → tests job green.
 - [ ] **Step 5: Live verify:** fetch the Pages URL until it serves; open in preview browser; badge PASS. Confirm README renders (badge shows passing).
-- [ ] **Step 6: Vault (standing order):** create `C:\Users\Alex\ObsidianVault\claude-memory\18-options-pricing-engine\` with `_INDEX.md`, `PROJECT_OVERVIEW.md`, `DECISIONS.md`, `KNOWN_ISSUES.md` per `00-meta/templates`; register in `VAULT_INDEX.md`; update `11-ideas/_INDEX.md` status snapshot (idea #2 of 07-14 → Done); final commit.
+- [ ] **Step 6:** Private project-notes update (external to this repo).
 
 ---
 
