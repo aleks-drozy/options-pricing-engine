@@ -1,0 +1,22 @@
+{
+  "fetched_utc": "2026-07-18T10:00:00Z",
+  "spot": 100.0,
+  "r": 0.04,
+  "q": 0.012,
+  "r_source": "^IRX close / 100 (fixture)",
+  "q_source": "trailing 12m dividends / spot (fixture)",
+  "expiries": [
+    {"expiry": "2026-07-21", "dte": 3, "quotes": [
+      {"strike": 100, "kind": "call", "bid": 1.0, "ask": 1.1}
+    ]},
+    {"expiry": "2026-10-16", "dte": 90, "quotes": [
+      {"strike": 90, "kind": "call", "bid": 11.60, "ask": 11.80},
+      {"strike": 100, "kind": "call", "bid": 4.55, "ask": 4.75},
+      {"strike": 100, "kind": "put", "bid": 4.05, "ask": 4.25},
+      {"strike": 110, "kind": "call", "bid": 1.05, "ask": 1.15},
+      {"strike": 100, "kind": "call", "bid": 0.0, "ask": 4.8},
+      {"strike": 105, "kind": "call", "bid": 1.0, "ask": 2.0},
+      {"strike": 220, "kind": "call", "bid": 0.05, "ask": 0.07}
+    ]}
+  ]
+}
