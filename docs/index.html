@@ -271,11 +271,15 @@
             </tbody>
           </table>
           <p class="chart-caption" id="greeks-source">Greeks: closed-form Black-Scholes (European).</p>
+          <div class="chart-block">
+            <canvas id="canvas-greeks" width="640" height="220" aria-label="Delta and gamma vs spot"></canvas>
+            <p class="chart-caption">Cyan: delta (own scale). Gold: gamma (own scale). Both vs spot at the sliders' K, T, &sigma;, r, q, recomputed live &mdash; closed-form for European, central FD on the tree for American.</p>
+          </div>
         </div>
 
         <div class="chart-block panel">
           <canvas id="canvas-payoff" width="640" height="320" aria-label="Payoff and model value vs spot"></canvas>
-          <p class="chart-caption">Gold: intrinsic payoff at expiry. Cyan: current model value across spot, at the sliders' K, T, &sigma;, r, q.</p>
+          <p class="chart-caption">Gold: intrinsic payoff at expiry. Gold dashed: P&amp;L at expiry (payoff minus the current model price at the sliders' spot). Cyan: current model value across spot, at the sliders' K, T, &sigma;, r, q.</p>
         </div>
       </div>
     </div>
@@ -289,7 +293,7 @@
     <div class="conv-grid">
       <div class="chart-block panel">
         <canvas id="canvas-mc" width="480" height="340" aria-label="Monte Carlo convergence"></canvas>
-        <p class="chart-caption">Monte Carlo: error vs number of simulated paths (single seed = 5).</p>
+        <p class="chart-caption">Monte Carlo: error vs number of simulated paths (single seed = 5). Shaded band: &plusmn;1 standard error reported by the pricer at each N.</p>
       </div>
       <div class="chart-block panel">
         <canvas id="canvas-tree" width="480" height="340" aria-label="Tree convergence"></canvas>
@@ -630,6 +634,7 @@ function updatePricer() {
   });
 
   drawPayoffChart();
+  drawGreeksChart();
 }
 
 /* ---------- canvas helpers ---------- */
@@ -684,12 +689,23 @@ function drawPayoffChart() {
   const { K, sigma, T, r, q, kind, american } = state;
   const sMin = 50, sMax = 200;
   const n = 120;
+
+  // premium paid = the current model price at the sliders' spot (matches the readout)
+  let premium = null;
+  try {
+    premium = american
+      ? crrPrice(state.S, K, T, r, sigma, q, kind, true, 500)
+      : bsPrice(state.S, K, T, r, sigma, q, kind);
+  } catch (err) { premium = null; }
+
   const payoff = [];
   const model = [];
+  const pnl = [];
   for (let i = 0; i <= n; i++) {
     const S = sMin + (sMax - sMin) * i / n;
     const intrinsic = kind === 'call' ? Math.max(S - K, 0) : Math.max(K - S, 0);
     payoff.push([S, intrinsic]);
+    if (premium !== null) pnl.push([S, intrinsic - premium]);
     try {
       const v = american
         ? crrPrice(S, K, T, r, sigma, q, kind, true, 200)
@@ -697,16 +713,107 @@ function drawPayoffChart() {
       model.push([S, v]);
     } catch (err) { /* skip invalid point */ }
   }
-  const allY = payoff.map(p => p[1]).concat(model.map(p => p[1]));
+  const allY = payoff.map(p => p[1]).concat(model.map(p => p[1]), pnl.map(p => p[1]));
   const yMax = Math.max(...allY) * 1.1 || 1;
+  const yMin = Math.min(0, ...allY) * 1.1;
 
   drawLinearAxes(ctx, w, h, 'Spot S', 'Value');
+
+  // zero line (P&L goes negative below breakeven)
+  if (yMin < 0) {
+    ctx.strokeStyle = '#3b4457';
+    ctx.beginPath();
+    ctx.moveTo(PAD.l, py(0, yMin, yMax, h));
+    ctx.lineTo(w - PAD.r, py(0, yMin, yMax, h));
+    ctx.stroke();
+  }
 
   ctx.strokeStyle = '#eab308';
   ctx.lineWidth = 2;
   ctx.beginPath();
   payoff.forEach(([S, v], i) => {
-    const x = px(S, sMin, sMax, w), y = py(v, 0, yMax, h);
+    const x = px(S, sMin, sMax, w), y = py(v, yMin, yMax, h);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  // P&L at expiry: payoff minus the premium paid (gold, dashed)
+  if (pnl.length > 0) {
+    ctx.strokeStyle = '#eab308';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([6, 4]);
+    ctx.beginPath();
+    pnl.forEach(([S, v], i) => {
+      const x = px(S, sMin, sMax, w), y = py(v, yMin, yMax, h);
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    ctx.stroke();
+    ctx.setLineDash([]);
+  }
+
+  ctx.strokeStyle = '#22d3ee';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  model.forEach(([S, v], i) => {
+    const x = px(S, sMin, sMax, w), y = py(v, yMin, yMax, h);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.stroke();
+
+  const cx = px(state.S, sMin, sMax, w);
+  ctx.strokeStyle = '#3b4457';
+  ctx.setLineDash([3, 3]);
+  ctx.beginPath();
+  ctx.moveTo(cx, PAD.t);
+  ctx.lineTo(cx, h - PAD.b);
+  ctx.stroke();
+  ctx.setLineDash([]);
+}
+
+function drawGreeksChart() {
+  const canvas = document.getElementById('canvas-greeks');
+  const { ctx, w, h } = setupCanvas(canvas);
+  clear(ctx, w, h);
+  const { K, sigma, T, r, q, kind, american } = state;
+  const sMin = 50, sMax = 200;
+  const n = american ? 60 : 120;  // FD-on-tree is ~600x the cost of closed form
+  const deltas = [];
+  const gammas = [];
+  for (let i = 0; i <= n; i++) {
+    const S = sMin + (sMax - sMin) * i / n;
+    try {
+      if (american) {
+        // central FD on the tree, delta+gamma only (3 evals, not full crrGreeks)
+        const hS = 0.005 * S;
+        const base = crrPrice(S, K, T, r, sigma, q, kind, true, 200);
+        const up = crrPrice(S + hS, K, T, r, sigma, q, kind, true, 200);
+        const dn = crrPrice(S - hS, K, T, r, sigma, q, kind, true, 200);
+        deltas.push([S, (up - dn) / (2 * hS)]);
+        gammas.push([S, (up - 2 * base + dn) / (hS * hS)]);
+      } else {
+        const g = bsGreeks(S, K, T, r, sigma, q, kind);
+        deltas.push([S, g.delta]);
+        gammas.push([S, g.gamma]);
+      }
+    } catch (err) { /* skip invalid point */ }
+  }
+  if (deltas.length === 0) return;
+
+  drawLinearAxes(ctx, w, h, 'Spot S', 'delta / gamma');
+
+  // each curve on its own y-scale (delta is O(1), gamma is O(0.01))
+  const dVals = deltas.map(p => p[1]);
+  const dMin = Math.min(0, ...dVals);
+  let dMax = Math.max(0, ...dVals);
+  if (dMax - dMin < 1e-12) dMax = dMin + 1;
+  const gVals = gammas.map(p => Math.max(p[1], 0));
+  const gMax = (Math.max(...gVals) || 1) * 1.1;
+
+  ctx.strokeStyle = '#eab308';
+  ctx.lineWidth = 1.5;
+  ctx.beginPath();
+  gammas.forEach(([S, v], i) => {
+    const x = px(S, sMin, sMax, w), y = py(Math.max(v, 0), 0, gMax, h);
     i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
   });
   ctx.stroke();
@@ -714,8 +821,8 @@ function drawPayoffChart() {
   ctx.strokeStyle = '#22d3ee';
   ctx.lineWidth = 2;
   ctx.beginPath();
-  model.forEach(([S, v], i) => {
-    const x = px(S, sMin, sMax, w), y = py(v, 0, yMax, h);
+  deltas.forEach(([S, v], i) => {
+    const x = px(S, sMin, sMax, w), y = py(v, dMin, dMax, h);
     i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
   });
   ctx.stroke();
@@ -738,19 +845,39 @@ function logTicks(min, max) {
   return ticks;
 }
 
-function drawLogLogChart(canvasId, points, refSlope, xLabel, yLabel, color) {
+function drawLogLogChart(canvasId, points, refSlope, xLabel, yLabel, color, band) {
   const canvas = document.getElementById(canvasId);
   const { ctx, w, h } = setupCanvas(canvas);
   clear(ctx, w, h);
 
   const xs = points.map(p => p[0]);
   const ys = points.map(p => Math.max(p[1], 1e-16));
+  if (band) band.forEach(([, , hi]) => ys.push(Math.max(hi, 1e-16)));
   const xMin = Math.min(...xs), xMax = Math.max(...xs);
   const yMin = Math.min(...ys) * 0.5, yMax = Math.max(...ys) * 2;
   const lx = v => Math.log10(v), ly = v => Math.log10(v);
   const lxMin = lx(xMin), lxMax = lx(xMax), lyMin = ly(yMin), lyMax = ly(yMax);
 
   drawLinearAxes(ctx, w, h, xLabel, yLabel);
+
+  // shaded +/-1 SE band (clamped to the chart's log floor), drawn under everything
+  if (band) {
+    const clampY = v => Math.min(Math.max(v, yMin), yMax);
+    ctx.beginPath();
+    band.forEach(([xv, , hi], i) => {
+      const x = px(lx(xv), lxMin, lxMax, w);
+      const y = py(ly(clampY(Math.max(hi, 1e-16))), lyMin, lyMax, h);
+      i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+    });
+    for (let i = band.length - 1; i >= 0; i--) {
+      const x = px(lx(band[i][0]), lxMin, lxMax, w);
+      const y = py(ly(clampY(Math.max(band[i][1], 1e-16))), lyMin, lyMax, h);
+      ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+    ctx.fillStyle = color + '26';
+    ctx.fill();
+  }
 
   ctx.fillStyle = '#64748b';
   ctx.font = '10px ' + getComputedStyle(document.body).fontFamily;
@@ -802,7 +929,11 @@ function drawConvergenceCharts() {
   const trueBs = bsPrice(base.S, base.K, base.T, base.r, base.sigma, base.q, MC.kind);
 
   const mcPoints = MC.rows.map(row => [row.n, Math.abs(row.price - trueBs)]);
-  drawLogLogChart('canvas-mc', mcPoints, -0.5, 'N paths (log)', '|error| (log)', '#22d3ee');
+  const mcBand = MC.rows.map(row => {
+    const err = Math.abs(row.price - trueBs);
+    return [row.n, err - row.se, err + row.se];
+  });
+  drawLogLogChart('canvas-mc', mcPoints, -0.5, 'N paths (log)', '|error| (log)', '#22d3ee', mcBand);
 
   const steps = [10, 20, 50, 100, 200, 500, 1000];
   const treePoints = steps.map(n => {

@@ -32,7 +32,8 @@ def build(template: str | Path = "viz/template.html",
                            ("__MC__", mc_payload()), ("__META__", meta)):
         html = html.replace(token, json.dumps(payload))
     Path(out).parent.mkdir(exist_ok=True)
-    Path(out).write_text(html, encoding="utf-8")
+    # newline="\n": byte-identical output on Windows and Linux (repo is eol=lf)
+    Path(out).write_text(html, encoding="utf-8", newline="\n")
     print(f"wrote {out}")
 
 
