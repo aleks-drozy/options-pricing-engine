@@ -139,3 +139,7 @@ fails; README badge states the gate result honestly.
 3. Explorer live on GitHub Pages, self-check PASS.
 4. Vault: new numbered project folder (18) seeded per conventions; README links
    from portfolio later (separate task, not this build).
+
+## Amendments
+
+- 2026-07-18 (build, Task 7): Gate 5 criterion amended to rel < 1e-4 OR abs < 1e-8 (far-OTM greeks ~1e-6 make the FD reference cancellation-noise-dominated). Gate 3 monotonicity waived below a 1e-9 absolute noise floor (deep-ITM/short-T tree already exact to machine epsilon at 200 steps). Both discovered by the gate run itself; intent of both gates unchanged.

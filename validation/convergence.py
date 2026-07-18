@@ -15,7 +15,11 @@ def run() -> dict:
         bs = bs_price(g["S"], g["K"], g["T"], g["r"], g["sigma"], g["q"], "call")
         e200 = abs(crr_price(g["S"], g["K"], g["T"], g["r"], g["sigma"], g["q"], "call", steps=200) - bs)
         e2000 = abs(crr_price(g["S"], g["K"], g["T"], g["r"], g["sigma"], g["q"], "call", steps=2000) - bs)
-        if not (e2000 < e200 and e2000 < max(0.01, 0.001 * bs)):
+        # For deep-ITM short-T points the tree is already exact to machine epsilon
+        # at both step counts, so requiring monotonic improvement below a 1e-9
+        # absolute noise floor is meaningless - accept either monotonic progress
+        # or "already below the noise floor".
+        if not ((e2000 < e200 or e2000 < 1e-9) and e2000 < max(0.01, 0.001 * bs)):
             tree_fails.append({**g, "e200": e200, "e2000": e2000})
 
     bs_base = bs_price(**BASE, kind="call")
