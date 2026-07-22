@@ -4,6 +4,14 @@
 
 **▶ Live explorer: [aleks-drozy.github.io/options-pricing-engine](https://aleks-drozy.github.io/options-pricing-engine/)** — sliders for S, K, sigma, T, r, q; live BS/tree/MC prices, payoff + Greeks, and a self-check badge that re-verifies its own numbers on every load.
 
+![SPY implied volatility smile and ATM term structure](charts/smile.png)
+
+Implied vol inverted from real SPY call quotes: on the left, the smile against
+moneyness `K/S` for the four nearest expiries (9, 10, 11 and 13 DTE) — the
+market quotes a different `sigma` at every strike, which flat-vol
+Black-Scholes says is impossible; on the right, at-the-money IV by expiry
+across the snapshot's 9-90 DTE window (13.6% to 15.9%).
+
 **Three pricers, one truth — and the market disagrees with all of them.**
 
 Black-Scholes closed form, a CRR binomial tree (European and American), and a
@@ -27,6 +35,13 @@ model assumes away. See [WRITEUP.md](WRITEUP.md) for the full finding.
 | 6 | No-arbitrage (American ≥ European) | ✓ 0 violations, worst `q=0` gap `4.55e-13` |
 | 7 | IV round-trip (synthetic + real SPY snapshot) | ✓ synthetic worst error `8.42e-13`; 3587 kept quotes, 3485 resolved (97.2%) + 102 counted failures |
 
+![Monte Carlo pricing error against path count, on log-log axes](charts/convergence_mc.png)
+
+Gate 4 in one picture: absolute `|MC - BS|` error for a single seed from 1e3 to
+1e6 paths, plotted against the simulation's own standard error and an
+`O(1/sqrt(N))` reference — a single seed bounces around that line, which is why
+the gate scores coverage over 200 seeds rather than one run.
+
 Real numbers, regenerated from [`results/validation.json`](results/validation.json)
 by `run_validate.py` — not hand-typed. Three gate criteria have been amended
 after gate runs themselves surfaced numerical edge cases; see
@@ -39,7 +54,7 @@ This is a **research project, not trading advice.**
 ```bash
 pip install -r requirements-dev.txt
 
-python -m pytest              # 56 tests, no network
+python -m pytest              # 59 tests, no network
 python run_validate.py        # -> results/validation.json (the 7-gate verdict above)
 
 python -m scripts.make_charts # -> charts/*.png
@@ -77,7 +92,7 @@ options-pricing-engine/
 │   ├── make_golden.py # viz golden table -> results/golden.json
 │   └── build_viz.py   # inject data+golden into viz/template.html -> docs/index.html
 ├── viz/template.html
-├── tests/             # pytest, no network, 56 tests
+├── tests/             # pytest, no network, 59 tests
 ├── run_validate.py    # runs all gates -> results/validation.json, non-zero exit on fail
 ├── data/spy_chain.json    # committed SPY snapshot
 ├── results/ · charts/ · docs/   (docs/ = GitHub Pages, self-check PASS 24/24)
@@ -88,5 +103,4 @@ options-pricing-engine/
 
 - [WRITEUP.md](WRITEUP.md) — method, the full 7-gate results table, the smile
   finding, and limitations
-- [docs/superpowers/specs/2026-07-18-options-pricing-engine-design.md](docs/superpowers/specs/2026-07-18-options-pricing-engine-design.md) — the design spec, including the amendments log
-- [docs/superpowers/plans/2026-07-18-options-pricing-engine.md](docs/superpowers/plans/2026-07-18-options-pricing-engine.md) — the 11-task implementation plan
+- [docs/specs/2026-07-18-options-pricing-engine.md](docs/specs/2026-07-18-options-pricing-engine.md) — the design spec, written before the engine was, including the amendments log

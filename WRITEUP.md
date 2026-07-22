@@ -168,7 +168,7 @@ Charts: `charts/smile.png` (per-expiry smile + term structure),
 - **Three gate criteria have been amended after gate runs**, each discovered
   by running (or auditing) the gates themselves rather than decided in
   advance (full text in the spec's Amendments section,
-  [`docs/superpowers/specs/2026-07-18-options-pricing-engine-design.md`](docs/superpowers/specs/2026-07-18-options-pricing-engine-design.md)):
+  [`docs/specs/2026-07-18-options-pricing-engine.md`](docs/specs/2026-07-18-options-pricing-engine.md)):
   - **Gate 5 (Greeks):** amended from a pure relative-error criterion to
     `rel < 1e-4 OR abs < 1e-8`. Far-OTM Greeks are ~1e-6 in magnitude, which
     makes the finite-difference reference itself cancellation-noise-dominated
@@ -197,6 +197,5 @@ Charts: `charts/smile.png` (per-expiry smile + term structure),
 ## Links
 
 - [`README.md`](README.md) — quick start, verdict table, live explorer
-- [`docs/superpowers/specs/2026-07-18-options-pricing-engine-design.md`](docs/superpowers/specs/2026-07-18-options-pricing-engine-design.md) — the design spec, including the Amendments log
-- [`docs/superpowers/plans/2026-07-18-options-pricing-engine.md`](docs/superpowers/plans/2026-07-18-options-pricing-engine.md) — the 11-task implementation plan
+- [`docs/specs/2026-07-18-options-pricing-engine.md`](docs/specs/2026-07-18-options-pricing-engine.md) — the design spec, committed before the engine was written, including the Amendments log
 - [`results/validation.json`](results/validation.json) — machine-generated gate output
